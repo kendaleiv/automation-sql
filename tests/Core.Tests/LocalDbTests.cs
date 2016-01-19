@@ -8,37 +8,12 @@ namespace RimDev.Automation.Core
     public class LocalDbTests
     {
         [Fact]
-        public void Can_CreateLocalDB_With_V11()
+        public void Can_Create_LocalDB_with_custom_instance_name()
         {
-            using (var db = new LocalDb(version: LocalDb.Versions.V11))
+            using (var db = new LocalDb(instance: "v12.0"))
             {
                 Assert.NotNull(db);
             }
-        }
-
-        [Fact]
-        public void Can_CreateLocalDB_With_V12()
-        {
-            using (var db = new LocalDb(version: LocalDb.Versions.V12))
-            {
-                Assert.NotNull(db);
-            }
-        }
-
-        [Fact]
-        public void LocalDB_Throws_Valid_Exception_When_Not_Supported_Version()
-        {
-            Assert.Throws<ArgumentOutOfRangeException>(() =>
-            {
-                using (var db = new LocalDb(version: "vBad")) {}
-            });
-        }
-
-        [Fact]
-        public void LocalDB_Versions_From_Registry()
-        {
-            var result = LocalDb.Versions.InstalledVersions;
-            Assert.Equal(LocalDb.Versions.All, result, StringComparer.CurrentCultureIgnoreCase);
         }
 
         [Fact]
@@ -51,11 +26,11 @@ namespace RimDev.Automation.Core
         }
 
         [Fact]
-        public void LocalDb_defaults_to_V11()
+        public void LocalDb_defaults_to_MSSQLLocalDB()
         {
             using (var db = new LocalDb())
             {
-                Assert.Equal(LocalDb.Versions.V11, db.Version);
+                Assert.Equal(LocalDb.DefaultInstanceName, db.Instance);
             }
         }
 

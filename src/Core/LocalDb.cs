@@ -1,47 +1,14 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
 using System.IO;
-using System.Linq;
 using System.Reflection;
-using Microsoft.Win32;
-
 
 namespace RimDev.Automation.Sql
 {
     public class LocalDb : IDisposable
     {
-        public static class Versions
-        {
-            public const string V11 = "v11.0";
-            public const string V12 = "v12.0";
-
-            private static readonly Lazy<IReadOnlyList<string>> LazyInstalledVersions
-                = new Lazy<IReadOnlyList<string>>(() =>
-                {
-                    return new[] {
-                            Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Microsoft SQL Server Local DB\Installed Versions\11.0", "ParentInstance", null)  == null ? null : V11,
-                            Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Microsoft SQL Server Local DB\Installed Versions\12.0", "ParentInstance", null)  == null ? null : V12,
-                        }
-                    .Where(x => !string.IsNullOrWhiteSpace(x))
-                    .ToList()
-                    .AsReadOnly();
-                });
-
-            public static readonly IReadOnlyList<string> All
-                = new List<string> { V11, V12 }.AsReadOnly();
-
-            public static bool IsValid(string version)
-            {
-                return InstalledVersions.Any(v => v.Equals(version, StringComparison.CurrentCultureIgnoreCase));
-            }
-
-            public static IReadOnlyList<string> InstalledVersions
-            {
-                get { return LazyInstalledVersions.Value; }
-            }
-        }
+        public const string DefaultInstanceName = "MSSQLLocalDB";
 
         public string ConnectionString { get; private set; }
 
@@ -53,7 +20,7 @@ namespace RimDev.Automation.Sql
 
         public string DatabaseLogPath { get; private set; }
 
-        public string Version { get; protected set; }
+        public string Instance { get; protected set; }
 
         public string Location { get; protected set; }
 
@@ -65,18 +32,15 @@ namespace RimDev.Automation.Sql
 
         public LocalDb(
             string databaseName = null,
-            string version = Versions.V11,
+            string instance = DefaultInstanceName,
             string location = null,
             string databasePrefix = "localdb",
             Func<string> databaseSuffixGenerator = null,
             int? connectionTimeout = null,
             bool multipleActiveResultSets = false)
         {
-            if (!Versions.IsValid(version))
-                throw new ArgumentOutOfRangeException("version", Version, "is not a supported version of localdb on your local machine");
-
             Location = location;
-            Version = version;
+            Instance = instance;
             DatabaseSuffixGenerator = databaseSuffixGenerator ?? DateTime.Now.Ticks.ToString;
             ConnectionTimeout = connectionTimeout;
             MultipleActiveResultsSets = multipleActiveResultSets;
@@ -111,7 +75,7 @@ namespace RimDev.Automation.Sql
             }
 
             // If the database does not already exist, create it.
-            var connectionString = String.Format(@"Data Source=(LocalDB)\{0};Initial Catalog=master;Integrated Security=True", Version);
+            var connectionString = String.Format(@"Data Source=(LocalDB)\{0};Initial Catalog=master;Integrated Security=True", Instance);
             using (var connection = new SqlConnection(connectionString))
             {
                 connection.Open();
@@ -124,7 +88,7 @@ namespace RimDev.Automation.Sql
             // Open newly created, or old database.
             ConnectionString = String.Format(
                 @"Data Source=(LocalDB)\{0};Initial Catalog={1};Integrated Security=True;{2}{3}",
-                Version,
+                Instance,
                 DatabaseName,
                 ConnectionTimeout == null ? null : string.Format("Connection Timeout={0};", ConnectionTimeout),
                 MultipleActiveResultsSets == true ? "MultipleActiveResultSets=true;" : null);
@@ -134,7 +98,7 @@ namespace RimDev.Automation.Sql
         {
             try
             {
-                var connectionString = String.Format(@"Data Source=(LocalDB)\{0};Initial Catalog=master;Integrated Security=True", Version);
+                var connectionString = String.Format(@"Data Source=(LocalDB)\{0};Initial Catalog=master;Integrated Security=True", Instance);
                 using (var connection = new SqlConnection(connectionString))
                 {
                     connection.Open();
@@ -153,13 +117,13 @@ namespace RimDev.Automation.Sql
 
         public bool IsAttached()
         {
-            return IsAttached(DatabaseName, Version);
+            return IsAttached(DatabaseName, Instance);
         }
 
-        public static bool IsAttached(string databaseName, string version = Versions.V11)
+        public static bool IsAttached(string databaseName, string instance = DefaultInstanceName)
         {
             const string sql = "SELECT 1 FROM master.sys.databases WHERE name = @0";
-            using (var connection = new SqlConnection(string.Format(@"Data Source=(LocalDB)\{0};Initial Catalog=master;Integrated Security=True", version)))
+            using (var connection = new SqlConnection(string.Format(@"Data Source=(LocalDB)\{0};Initial Catalog=master;Integrated Security=True", instance)))
             {
                 connection.Open();
                 var cmd = connection.CreateCommand();
